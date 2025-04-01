@@ -14,7 +14,7 @@ struct Operation
     struct Operation *next;
 };
 
-void input(char *, int);
+int input(char *, int);
 int extract_operand(char *, int *);
 struct Operation *parse_expression(char *);
 struct Operation *create_operation_node(int, char);
@@ -30,8 +30,7 @@ int main()
 
     while (true)
     {
-        input(string, MAX_EXPR_LENGTH);
-        string_length = strlen(string);
+        string_length = input(string, MAX_EXPR_LENGTH);
 
         // If no input then ask for input again
         if (string_length == 0)
@@ -49,7 +48,7 @@ int main()
     return 0;
 }
 
-void input(char *string, int length)
+int input(char *string, int length)
 {
     printf(">> ");
     fgets(string, length, stdin);
@@ -58,6 +57,8 @@ void input(char *string, int length)
 
     // Remove the '\n' character from input string
     string[length - 1] = '\0';
+
+    return length - 1;
 }
 
 int extract_operand(char *string, int *index)
