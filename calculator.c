@@ -1,9 +1,8 @@
-// Evaluate function is yet to work on
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include <stdbool.h>
 
 #define MAX_EXPR_LENGTH 100
@@ -16,51 +15,35 @@ struct Operation
 };
 
 void input(char *, int);
+int extract_operand(char *, int *);
+struct Operation *parse_expression(char *);
 struct Operation *create_operation_node(int, char);
 struct Operation *append_operation_node(struct Operation *, int, char);
+void delete_operation_nextnode(struct Operation *node);
 int evaluate(struct Operation *);
-int add(int, int);
-int subtract(int, int);
-int multiply(int, int);
-int divide(int, int);
-int extract_operand(char *, int *);
 
 int main()
 {
-    char expression[MAX_EXPR_LENGTH];
-    char operator;
-    int index, operand, result, expression_length;
+    char string[MAX_EXPR_LENGTH];
+    int string_length, result;
+    struct Operation *expression;
 
     while (true)
     {
-        input(expression, MAX_EXPR_LENGTH);
-        expression_length = strlen(expression);
+        input(string, MAX_EXPR_LENGTH);
+        string_length = strlen(string);
 
         // If no input then ask for input again
-        if (expression_length == 0)
+        if (string_length == 0)
             continue;
 
         // EXIT command
-        if (strncmp(expression, "EXIT", expression_length) == 0 || strncmp(expression, "exit", expression_length) == 0)
+        if (strncmp(string, "EXIT", string_length) == 0)
             break;
 
-        // Convert expression from string to linked list
-        index = 0;
-        struct Operation *head, *tail;
-        operand = extract_operand(expression, &index);
-        head = create_operation_node(operand, '\0');
-        tail = head;
-        while (expression[index])
-        {
-            operator= expression[index];
-            index++;
-            operand = extract_operand(expression, &index);
-            tail = append_operation_node(tail, operand, operator);
-        }
-
-        result = evaluate(head);
-        head = NULL;
-        tail = NULL;
+        expression = parse_expression(string);
+        result = evaluate(expression);
+        expression = NULL;
         printf("%d\n", result);
     }
     return 0;
@@ -75,6 +58,37 @@ void input(char *string, int length)
 
     // Remove the '\n' character from input string
     string[length - 1] = '\0';
+}
+
+int extract_operand(char *string, int *index)
+{
+    int operand = 0;
+    while (isdigit(string[*index]))
+    {
+        operand = operand * 10 + (string[*index] - '0');
+        (*index)++;
+    }
+    return operand;
+}
+
+struct Operation *parse_expression(char *string)
+{
+    char operator;
+    int operand, index;
+    struct Operation *head, *tail;
+    index = 0;
+    operand = extract_operand(string, &index);
+    head = create_operation_node(operand, '\0');
+    tail = head;
+    while (string[index])
+    {
+        operator = string[index];
+        index++;
+        operand = extract_operand(string, &index);
+        tail = append_operation_node(tail, operand, operator);
+    }
+    tail = NULL;
+    return head;
 }
 
 struct Operation *create_operation_node(int operand, char operator)
@@ -94,89 +108,71 @@ struct Operation *append_operation_node(struct Operation *tail, int operand, cha
     return tail;
 }
 
+void delete_operation_nextnode(struct Operation *node)
+{
+    struct Operation *temp;
+    temp = node->next;
+    node->next = node->next->next;
+    free(temp);
+}
+
 int evaluate(struct Operation *head)
 {
-    struct Operation *node, *temp;
-    node = head;
-    while (node->next != NULL)
+    struct Operation *node;
+    int evaluated, precedence, result;
+    precedence = 1;
+    while (head->next != NULL)
     {
-        int evaluated = false;
-        switch (node->next->operator)
+        node = head;
+        while (node->next != NULL)
         {
-        case '*':
-            node->operand = multiply(node->operand, node->next->operand);
-            evaluated = true;
-            break;
-        case '/':
-            node->operand = divide(node->operand, node->next->operand);
-            evaluated = true;
-            break;
+            evaluated = false;
+            switch (precedence)
+            {
+            case 1:
+                switch (node->next->operator)
+                {
+                case '^':
+                    node->operand = pow(node->operand, node->next->operand);
+                    evaluated = true;
+                    break;
+                }
+                break;
+            case 2:
+                switch (node->next->operator)
+                {
+                case '*':
+                    node->operand = node->operand * node->next->operand;
+                    evaluated = true;
+                    break;
+                case '/':
+                    node->operand = node->operand / node->next->operand;
+                    evaluated = true;
+                    break;
+                }
+                break;
+            case 3:
+                switch (node->next->operator)
+                {
+                case '+':
+                    node->operand = node->operand + node->next->operand;
+                    evaluated = true;
+                    break;
+                case '-':
+                    node->operand = node->operand - node->next->operand;
+                    evaluated = true;
+                    break;
+                }
+                break;
+            }
+            if (evaluated)
+                delete_operation_nextnode(node);
+            else
+                node = node->next;
         }
-        if (evaluated)
-        {
-            temp = node->next;
-            node->next = node->next->next;
-            free(temp);
-        }
-        else
-            node = node->next;
+        precedence++;
     }
-    node = head;
-    while (node->next != NULL)
-    {
-        int evaluated = false;
-        switch (node->next->operator)
-        {
-        case '+':
-            node->operand = add(node->operand, node->next->operand);
-            evaluated = true;
-            break;
-        case '-':
-            node->operand = subtract(node->operand, node->next->operand);
-            evaluated = true;
-            break;
-        }
-        if (evaluated)
-        {
-            temp = node->next;
-            node->next = node->next->next;
-            free(temp);
-        }
-        else
-            node = node->next;
-    }
-    int result = node->operand;
-    free(node);
+    result = head->operand;
+    free(head);
     return result;
-}
-
-int add(int operand1, int operand2)
-{
-    return operand1 + operand2;
-}
-
-int subtract(int operand1, int operand2)
-{
-    return operand1 - operand2;
-}
-
-int multiply(int operand1, int operand2)
-{
-    return operand1 * operand2;
-}
-
-int divide(int operand1, int operand2)
-{
-    return operand1 / operand2;
-}
-
-int extract_operand(char *string, int *index)
-{
-    int operand = 0;
-    while (isdigit(string[*index]))
-    {
-        operand = operand * 10 + (string[*index] - '0');
-        (*index)++;
-    }
-    return operand;
 }
